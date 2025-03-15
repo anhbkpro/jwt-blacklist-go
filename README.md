@@ -69,6 +69,26 @@ EXISTS blacklist:<token-id>
 TTL blacklist:<token-id>
 ```
 
+## Unit Tests
+
+The project includes comprehensive tests to verify the token blacklisting functionality:
+
+```bash
+# Run all tests
+make test
+
+# Run specifically the multi-device scenario tests
+make test-multidevice
+
+# Run token expiration tests
+make test-expiration
+```
+
+These tests verify:
+- Users can be logged in on multiple devices simultaneously
+- Logging out from one device doesn't affect other devices
+- Blacklisted tokens are automatically removed from Redis when they expire
+
 ## Architecture
 
 The system uses a stateless JWT authentication mechanism where:

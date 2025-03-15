@@ -141,3 +141,93 @@ TTL blacklist:<token-id>
 2. **Self-maintaining**: Redis automatically removes expired entries
 3. **Performance**: Redis provides fast lookups for token validation
 4. **Simplicity**: No need for complex database schemas or maintenance tasks
+
+## Unit Tests
+
+The system includes comprehensive unit tests to verify the token blacklisting functionality, particularly for multi-device scenarios.
+
+### Multi-Device Test
+
+This test verifies that logging out from one device doesn't affect sessions on other devices:
+
+```go
+func TestMultiDeviceLogout(t *testing.T) {
+    // ...test setup...
+
+    // Step 1: Generate tokens for "iPhone" (first device)
+    iPhoneAccessToken, _, err := jwtManager.GenerateTokens(user)
+
+    // Step 2: Generate tokens for "iPad" (second device)
+    iPadAccessToken, _, err := jwtManager.GenerateTokens(user)
+
+    // Ensure the two tokens have different JTIs
+    assert.NotEqual(t, iPhoneTokenID, iPadTokenID, "Tokens should have unique JTIs")
+
+    // Step 3: Logout from iPad (blacklist its token)
+    err = jwtManager.BlacklistToken(iPadAccessToken)
+
+    // Verify iPad token is now blacklisted
+    isBlacklisted, err := jwtManager.IsTokenBlacklisted(iPadTokenID)
+    assert.True(t, isBlacklisted, "iPad token should be blacklisted")
+
+    // Verify iPhone token is NOT blacklisted
+    isBlacklisted, err = jwtManager.IsTokenBlacklisted(iPhoneTokenID)
+    assert.False(t, isBlacklisted, "iPhone token should not be blacklisted")
+
+    // Step 4: Try to verify both tokens
+    // iPad token should fail verification
+    _, err = jwtManager.VerifyToken(iPadAccessToken)
+    assert.Error(t, err)
+    assert.Equal(t, ErrTokenBlacklisted, err)
+
+    // iPhone token should still pass verification
+    _, err = jwtManager.VerifyToken(iPhoneAccessToken)
+    assert.NoError(t, err)
+}
+```
+
+### Token Expiration Test
+
+This test verifies that blacklisted tokens are automatically removed from Redis when they expire:
+
+```go
+func TestTokenExpirationInBlacklist(t *testing.T) {
+    // ...test setup with short-lived tokens...
+
+    // Blacklist the token
+    err = jwtManager.BlacklistToken(accessToken)
+
+    // Verify token is blacklisted
+    isBlacklisted, err := jwtManager.IsTokenBlacklisted(accessClaims.TokenID)
+    assert.True(t, isBlacklisted)
+
+    // Wait for token to expire in both JWT and Redis
+    time.Sleep(3 * time.Second)
+
+    // Blacklist entry should be automatically removed by Redis
+    isBlacklisted, err = jwtManager.IsTokenBlacklisted(accessClaims.TokenID)
+    assert.False(t, isBlacklisted, "Blacklist entry should be automatically removed")
+
+    // Token verification should still fail, but now due to expiration
+    _, err = jwtManager.VerifyToken(accessToken)
+    assert.Error(t, err)
+    assert.Equal(t, ErrTokenExpired, err)
+}
+```
+
+### Running the Tests
+
+Use the provided Makefile commands to run the tests:
+
+```bash
+# Run all tests
+make test
+
+# Run only the multi-device tests
+make test-multidevice
+
+# Run token expiration tests
+make test-expiration
+```
+
+Note: The tests require a running Redis instance on localhost:6379.
