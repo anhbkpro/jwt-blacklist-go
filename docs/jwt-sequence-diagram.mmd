@@ -1,0 +1,66 @@
+sequenceDiagram
+    participant C as Client
+    participant API as API Server
+    participant Auth as Auth Service
+    participant Redis as Redis Cache
+    participant Store as User Store
+
+    %% Login Flow
+    rect rgb(191, 223, 255)
+    Note over C,Store: Login Process
+    C->>API: POST /api/auth/login (username, password)
+    API->>Auth: Login(username, password)
+    Auth->>Store: GetUserByUsername(username)
+    Store-->>Auth: User data
+    Auth->>Auth: VerifyPassword(password, hashedPassword)
+    Auth->>Auth: GenerateTokens(user)
+    Auth-->>API: access_token, refresh_token
+    API-->>C: 200 OK (tokens, expiry)
+    end
+
+    %% Protected Resource Access
+    rect rgb(255, 230, 204)
+    Note over C,API: Protected Resource Access
+    C->>API: GET /api/protected (with access_token)
+    API->>Auth: VerifyToken(access_token)
+    Auth->>Redis: IsTokenBlacklisted(jti)
+    Redis-->>Auth: Not blacklisted
+    Auth-->>API: Valid token, user claims
+    API-->>C: 200 OK (protected resource)
+    end
+
+    %% Logout Flow
+    rect rgb(255, 204, 204)
+    Note over C,Redis: Logout Process
+    C->>API: POST /api/auth/logout (with access_token)
+    API->>Auth: BlacklistToken(access_token)
+    Auth->>Auth: Extract token ID (jti)
+    Auth->>Redis: Set("blacklist:[jti]", "1", expiry)
+    Redis-->>Auth: OK
+    Auth-->>API: Token blacklisted
+    API-->>C: 200 OK (logged out)
+    end
+
+    %% Token Refresh
+    rect rgb(204, 255, 204)
+    Note over C,API: Token Refresh
+    C->>API: POST /api/auth/refresh (with refresh_token)
+    API->>Auth: RefreshToken(refresh_token)
+    Auth->>Auth: VerifyToken(refresh_token)
+    Auth->>Redis: IsTokenBlacklisted(jti)
+    Redis-->>Auth: Not blacklisted
+    Auth->>Auth: Generate new access_token
+    Auth-->>API: New access_token
+    API-->>C: 200 OK (new access_token)
+    end
+
+    %% Failed Access After Logout
+    rect rgb(255, 204, 230)
+    Note over C,API: Access After Logout
+    C->>API: GET /api/protected (with blacklisted access_token)
+    API->>Auth: VerifyToken(access_token)
+    Auth->>Redis: IsTokenBlacklisted(jti)
+    Redis-->>Auth: Blacklisted
+    Auth-->>API: Token blacklisted error
+    API-->>C: 401 Unauthorized (token revoked)
+    end
