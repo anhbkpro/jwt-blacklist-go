@@ -2,6 +2,7 @@ package models
 
 import (
 	"crypto/rand"
+	"crypto/subtle"
 	"encoding/base64"
 	"errors"
 	"fmt"
@@ -73,7 +74,7 @@ func VerifyPassword(password, encodedHash string) (bool, error) {
 	log.Println(newHash)
 
 	// Check if the hashes match using a constant-time comparison
-	return true, nil
+	return subtle.ConstantTimeCompare(hash, newHash) == 1, nil
 }
 
 // Helper function to decode a password hash
@@ -138,7 +139,7 @@ var UserStore = map[string]*User{
 		Username: "admin",
 		Email:    "admin@example.com",
 		// Default password: "admin123"
-		Password: "$argon2id$v=19$m=65536,t=3,p=2$eRsqOzVJXJKn5SBu4JfJHg$hzn22CNKZRk0rkVJJT84yISSZZt7xYX1LbPX/HOyPOU",
+		Password: "$argon2id$v=19$m=65536,t=3,p=2$mwTVNvIy4EBaphLMv6Iozg$HrAc8MQ/g1HX6eryWcFc75h7vknOqADznwS6zA04REw",
 		Role:     "admin",
 	},
 	"user": {
@@ -146,7 +147,7 @@ var UserStore = map[string]*User{
 		Username: "user",
 		Email:    "user@example.com",
 		// Default password: "user123"
-		Password: "$argon2id$v=19$m=65536,t=3,p=2$p/EjdXbWdxkzqQy3YRJjsQ$egSEfw6OnHVf05PyqnRwFCg6/0tgLwc8G5SpAn0JDIU",
+		Password: "$argon2id$v=19$m=65536,t=3,p=2$P00D1MRXhY+tSrYMCDe0rg$JkUThHcvsIxD1RW+5zGqCfvzbtK2+RQ5iV6jyH/OcjI",
 		Role:     "user",
 	},
 }
