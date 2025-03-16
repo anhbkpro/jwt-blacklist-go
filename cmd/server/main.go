@@ -9,14 +9,36 @@ import (
 	"time"
 
 	"github.com/anhbkpro/jwt-blacklist-go/config"
+	_ "github.com/anhbkpro/jwt-blacklist-go/docs" // This is required for swagger
 	"github.com/anhbkpro/jwt-blacklist-go/internal/auth"
 	"github.com/anhbkpro/jwt-blacklist-go/internal/handlers"
 	"github.com/anhbkpro/jwt-blacklist-go/internal/middleware"
 	"github.com/go-redis/redis/v8"
 	"github.com/labstack/echo/v4"
 	echomiddleware "github.com/labstack/echo/v4/middleware"
+	echoSwagger "github.com/swaggo/echo-swagger"
 )
 
+// @title JWT Blacklisting API
+// @version 1.0
+// @description API for JWT authentication with token blacklisting
+// @termsOfService http://swagger.io/terms/
+
+// @contact.name API Support
+// @contact.url http://www.yourcompany.com/support
+// @contact.email support@yourcompany.com
+
+// @license.name Apache 2.0
+// @license.url http://www.apache.org/licenses/LICENSE-2.0.html
+
+// @host localhost:8088
+// @BasePath /api
+// @schemes http https
+
+// @securityDefinitions.apikey BearerAuth
+// @in header
+// @name Authorization
+// @description Type "Bearer" followed by a space and the JWT token.
 func main() {
 	// Load configuration
 	cfg := config.NewConfig()
@@ -56,6 +78,9 @@ func main() {
 	e.Use(echomiddleware.Logger())
 	e.Use(echomiddleware.Recover())
 	e.Use(echomiddleware.CORS())
+
+	// Swagger documentation
+	e.GET("/swagger/*", echoSwagger.WrapHandler)
 
 	// Routes
 	e.GET("/", func(c echo.Context) error {

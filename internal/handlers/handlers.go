@@ -23,24 +23,34 @@ func NewAuthHandler(jwtManager *auth.JWTManager) *AuthHandler {
 
 // LoginRequest represents the login request body
 type LoginRequest struct {
-	Username string `json:"username"`
-	Password string `json:"password"`
+	Username string `json:"username" example:"admin"`
+	Password string `json:"password" example:"admin123"`
 }
 
 // TokenResponse represents the response for token requests
 type TokenResponse struct {
-	AccessToken  string `json:"access_token"`
-	RefreshToken string `json:"refresh_token,omitempty"`
-	TokenType    string `json:"token_type"`
-	ExpiresIn    int    `json:"expires_in"`
+	AccessToken  string `json:"access_token" example:"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."`
+	RefreshToken string `json:"refresh_token,omitempty" example:"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."`
+	TokenType    string `json:"token_type" example:"Bearer"`
+	ExpiresIn    int    `json:"expires_in" example:"900"`
 }
 
 // ErrorResponse represents an error response
 type ErrorResponse struct {
-	Message string `json:"message"`
+	Message string `json:"message" example:"Invalid credentials"`
 }
 
 // Login handles the login request
+// @Summary Login to the system
+// @Description Authenticate user and get JWT tokens
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Param request body LoginRequest true "Login request"
+// @Success 200 {object} TokenResponse "Successful login"
+// @Failure 400 {object} ErrorResponse "Invalid request"
+// @Failure 401 {object} ErrorResponse "Invalid credentials"
+// @Router /auth/login [post]
 func (h *AuthHandler) Login(c echo.Context) error {
 	var req LoginRequest
 	if err := c.Bind(&req); err != nil {
@@ -80,6 +90,15 @@ func (h *AuthHandler) Login(c echo.Context) error {
 }
 
 // RefreshToken handles token refresh requests
+// @Summary Refresh access token
+// @Description Get a new access token using a refresh token
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} TokenResponse "New access token"
+// @Failure 401 {object} ErrorResponse "Invalid refresh token"
+// @Router /auth/refresh [post]
 func (h *AuthHandler) RefreshToken(c echo.Context) error {
 	// Extract refresh token from Authorization header
 	authHeader := c.Request().Header.Get("Authorization")
@@ -109,6 +128,13 @@ func (h *AuthHandler) RefreshToken(c echo.Context) error {
 }
 
 // Logout handles logout requests (token revocation)
+// @Summary Logout from the system
+// @Description Revoke the current token
+// @Tags auth
+// @Security BearerAuth
+// @Success 200 {object} map[string]string "Successfully logged out"
+// @Failure 401 {object} ErrorResponse "Unauthorized"
+// @Router /auth/logout [post]
 func (h *AuthHandler) Logout(c echo.Context) error {
 	// Extract token from Authorization header
 	authHeader := c.Request().Header.Get("Authorization")
@@ -133,6 +159,14 @@ func (h *AuthHandler) Logout(c echo.Context) error {
 }
 
 // Protected is a handler for a protected resource
+// @Summary Get protected resource
+// @Description Access a protected resource requiring authentication
+// @Tags protected
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} map[string]interface{} "Protected resource"
+// @Failure 401 {object} ErrorResponse "Unauthorized"
+// @Router /protected [get]
 func (h *AuthHandler) Protected(c echo.Context) error {
 	// Get user claims from context (set by auth middleware)
 	claims, ok := c.Get("user").(*auth.JWTClaims)
@@ -151,6 +185,15 @@ func (h *AuthHandler) Protected(c echo.Context) error {
 }
 
 // AdminOnly is a handler for admin-only resources
+// @Summary Get admin resource
+// @Description Access an admin-only resource
+// @Tags admin
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} map[string]string "Admin resource"
+// @Failure 401 {object} ErrorResponse "Unauthorized"
+// @Failure 403 {object} ErrorResponse "Forbidden"
+// @Router /admin/dashboard [get]
 func (h *AuthHandler) AdminOnly(c echo.Context) error {
 	// Get user claims from context (set by auth middleware)
 	claims, ok := c.Get("user").(*auth.JWTClaims)
