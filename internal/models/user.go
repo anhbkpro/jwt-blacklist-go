@@ -1,12 +1,12 @@
 package models
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/subtle"
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"log"
 
 	"golang.org/x/crypto/argon2"
 )
@@ -67,11 +67,9 @@ func VerifyPassword(password, encodedHash string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	log.Println(params, salt, hash)
 
 	// Hash the password with the same parameters and salt
 	newHash := argon2.IDKey([]byte(password), salt, params.Iterations, params.Memory, params.Parallelism, params.KeyLength)
-	log.Println(newHash)
 
 	// Check if the hashes match using a constant-time comparison
 	return subtle.ConstantTimeCompare(hash, newHash) == 1, nil
@@ -132,8 +130,8 @@ func splitHashString(encodedHash string) []string {
 	return result
 }
 
-// In-memory user store for demonstration
-var UserStore = map[string]*User{
+// Default users for testing when database is not available
+var DefaultUsers = map[string]*User{
 	"admin": {
 		ID:       1,
 		Username: "admin",
@@ -152,8 +150,29 @@ var UserStore = map[string]*User{
 	},
 }
 
+// UserRepository defines the interface for user-related operations
+type UserRepository interface {
+	GetByUsername(ctx context.Context, username string) (*User, error)
+	Create(ctx context.Context, user *User) error
+	Update(ctx context.Context, user *User) error
+	Delete(ctx context.Context, id int) error
+}
+
+// UserService provides methods to interact with users
+type UserService struct {
+	repo UserRepository
+}
+
+// NewUserService creates a new user service
+func NewUserService(repo UserRepository) *UserService {
+	return &UserService{repo: repo}
+}
+
 // GetUserByUsername retrieves a user by username
-func GetUserByUsername(username string) (*User, bool) {
-	user, exists := UserStore[username]
-	return user, exists
+func (s *UserService) GetUserByUsername(ctx context.Context, username string) (*User, bool) {
+	user, err := s.repo.GetByUsername(ctx, username)
+	if err != nil || user == nil {
+		return nil, false
+	}
+	return user, true
 }

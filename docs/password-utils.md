@@ -45,10 +45,10 @@ In interactive mode, you'll be prompted to enter passwords one per line. Press C
 ```
 =============================================
 Password hash for 'user123':
-$argon2id$v=19$m=65536,t=3,p=2$UQBKD3mG6/oXmgI5/BQRJw$1q9wcAXy62OxvxJmDX6bQxNxh9TYrSjub4LdDY7Qd1k
+$argon2id$v=19$m=65536,t=3,p=2$mwTVNvIy4EBaphLMv6Iozg$HrAc8MQ/g1HX6eryWcFc75h7vknOqADznwS6zA04REw
 ---------------------------------------------
 Password hash for 'admin123':
-$argon2id$v=19$m=65536,t=3,p=2$eRsqOzVJXJKn5SBu4JfJHg$hzn22CNKZRk0rkVJJT84yISSZZt7xYX1LbPX/HOyPOU
+$argon2id$v=19$m=65536,t=3,p=2$P00D1MRXhY+tSrYMCDe0rg$JkUThHcvsIxD1RW+5zGqCfvzbtK2+RQ5iV6jyH/OcjI
 ---------------------------------------------
 =============================================
 ```

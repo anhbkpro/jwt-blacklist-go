@@ -32,10 +32,10 @@ type JWTManager struct {
 // JWTClaims contains the claims data stored in the JWT
 
 type JWTClaims struct {
-	UserId    int    `json:"user_id"`
+	UserID    int    `json:"user_id"`
 	Username  string `json:"username"`
 	Role      string `json:"role"`
-	TokenId   string `json:"jti"`
+	TokenID   string `json:"jti"`
 	TokenType string `json:"type"` // "access" or "refresh"
 	jwt.RegisteredClaims
 }
@@ -53,10 +53,10 @@ func (m *JWTManager) GenerateTokens(user *models.User) (string, string, error) {
 	// Generate access token
 	accessJti := generateTokenId()
 	accessClaims := JWTClaims{
-		UserId:    user.ID,
+		UserID:    user.ID,
 		Username:  user.Username,
 		Role:      user.Role,
-		TokenId:   accessJti,
+		TokenID:   accessJti,
 		TokenType: "access",
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(m.config.AccessTokenExpiration)),
@@ -73,10 +73,10 @@ func (m *JWTManager) GenerateTokens(user *models.User) (string, string, error) {
 	// Generate refresh token
 	refreshJti := generateTokenId()
 	refreshClaims := JWTClaims{
-		UserId:    user.ID,
+		UserID:    user.ID,
 		Username:  user.Username,
 		Role:      user.Role,
-		TokenId:   refreshJti,
+		TokenID:   refreshJti,
 		TokenType: "refresh",
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(m.config.RefreshTokenExpiration)),
@@ -119,7 +119,7 @@ func (m *JWTManager) VerifyToken(tokenString string) (*JWTClaims, error) {
 	}
 
 	// Check if token is blacklisted
-	isBlacklisted, err := m.IsTokenBlacklisted(claims.TokenId)
+	isBlacklisted, err := m.IsTokenBlacklisted(claims.TokenID)
 	if err != nil {
 		return nil, err
 	}
@@ -146,10 +146,10 @@ func (m *JWTManager) RefreshToken(refreshTokenString string) (string, error) {
 	// Create a new access token
 	accessJti := generateTokenId()
 	accessClaims := JWTClaims{
-		UserId:    claims.UserId,
+		UserID:    claims.UserID,
 		Username:  claims.Username,
 		Role:      claims.Role,
-		TokenId:   accessJti,
+		TokenID:   accessJti,
 		TokenType: "access",
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(m.config.AccessTokenExpiration)),
@@ -180,7 +180,7 @@ func (m *JWTManager) BlacklistToken(tokenString string) error {
 	}
 
 	// Get the token ID and expiration time
-	jti := claims.TokenId
+	jti := claims.TokenID
 	exp := claims.ExpiresAt
 
 	// Calculate time until token expiration

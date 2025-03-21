@@ -11,13 +11,15 @@ import (
 
 // AuthHandler handles authentication-related requests
 type AuthHandler struct {
-	jwtManager *auth.JWTManager
+	jwtManager  *auth.JWTManager
+	userService *models.UserService
 }
 
 // NewAuthHandler creates a new authentication handler
-func NewAuthHandler(jwtManager *auth.JWTManager) *AuthHandler {
+func NewAuthHandler(jwtManager *auth.JWTManager, userService *models.UserService) *AuthHandler {
 	return &AuthHandler{
-		jwtManager: jwtManager,
+		jwtManager:  jwtManager,
+		userService: userService,
 	}
 }
 
@@ -63,7 +65,7 @@ func (h *AuthHandler) Login(c echo.Context) error {
 	}
 
 	// Check if user exists
-	user, exists := models.GetUserByUsername(req.Username)
+	user, exists := h.userService.GetUserByUsername(c.Request().Context(), req.Username)
 	if !exists {
 		return echo.NewHTTPError(http.StatusUnauthorized, "invalid credentials")
 	}
@@ -177,7 +179,7 @@ func (h *AuthHandler) Protected(c echo.Context) error {
 	return c.JSON(http.StatusOK, map[string]interface{}{
 		"message": "This is a protected resource",
 		"user": map[string]interface{}{
-			"id":       claims.UserId,
+			"id":       claims.UserID,
 			"username": claims.Username,
 			"role":     claims.Role,
 		},
@@ -195,17 +197,6 @@ func (h *AuthHandler) Protected(c echo.Context) error {
 // @Failure 403 {object} ErrorResponse "Forbidden"
 // @Router /admin/dashboard [get]
 func (h *AuthHandler) AdminOnly(c echo.Context) error {
-	// Get user claims from context (set by auth middleware)
-	claims, ok := c.Get("user").(*auth.JWTClaims)
-	if !ok {
-		return echo.NewHTTPError(http.StatusUnauthorized, "unauthorized")
-	}
-
-	// Check if the user has the required role
-	if claims.Role != "admin" {
-		return echo.NewHTTPError(http.StatusForbidden, "insufficient permissions")
-	}
-
 	return c.JSON(http.StatusOK, map[string]string{
 		"message": "This is an admin-only resource",
 	})

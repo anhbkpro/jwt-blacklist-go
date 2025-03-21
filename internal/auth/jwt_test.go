@@ -73,7 +73,7 @@ func TestMultiDeviceLogout(t *testing.T) {
 		require.NotNil(t, iPhoneAccessClaims)
 
 		// Store the token ID for later reference
-		iPhoneTokenID := iPhoneAccessClaims.TokenId
+		iPhoneTokenID := iPhoneAccessClaims.TokenID
 
 		// Step 2: Generate tokens for "iPad" (second device)
 		iPadAccessToken, _, err := jwtManager.GenerateTokens(user)
@@ -86,7 +86,7 @@ func TestMultiDeviceLogout(t *testing.T) {
 		require.NotNil(t, iPadAccessClaims)
 
 		// Store the token ID for later reference
-		iPadTokenID := iPadAccessClaims.TokenId
+		iPadTokenID := iPadAccessClaims.TokenID
 
 		// Ensure the two tokens have different JTIs
 		assert.NotEqual(t, iPhoneTokenID, iPadTokenID, "Tokens should have unique JTIs")
@@ -178,7 +178,7 @@ func TestTokenExpirationInBlacklist(t *testing.T) {
 		require.NoError(t, err)
 
 		// Verify token is blacklisted
-		isBlacklisted, err := jwtManager.IsTokenBlacklisted(accessClaims.TokenId)
+		isBlacklisted, err := jwtManager.IsTokenBlacklisted(accessClaims.TokenID)
 		require.NoError(t, err)
 		assert.True(t, isBlacklisted)
 
@@ -191,7 +191,7 @@ func TestTokenExpirationInBlacklist(t *testing.T) {
 		time.Sleep(3 * time.Second)
 
 		// Blacklist entry should be automatically removed by Redis
-		isBlacklisted, err = jwtManager.IsTokenBlacklisted(accessClaims.TokenId)
+		isBlacklisted, err = jwtManager.IsTokenBlacklisted(accessClaims.TokenID)
 		require.NoError(t, err)
 		assert.False(t, isBlacklisted, "Blacklist entry should be automatically removed")
 

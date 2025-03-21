@@ -1,0 +1,37 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    depends_on:
+      - redis
+    environment:
+      - JWT_SECRET=your-super-secret-key-change-in-production
+      - ACCESS_TOKEN_EXPIRATION=15m
+      - REFRESH_TOKEN_EXPIRATION=7d
+      - REDIS_ADDR=redis:6379
+      - REDIS_PASSWORD=
+      - REDIS_DB=0
+      # Optional Supabase PostgreSQL connection
+      # Uncomment and fill these to use Supabase
+      # - DB_HOST=db.your-project-ref.supabase.co
+      # - DB_PORT=5432
+      # - DB_USER=postgres
+      # - DB_PASSWORD=your-supabase-password
+      # - DB_NAME=postgres
+    volumes:
+      - ./migrations:/app/migrations
+
+  redis:
+    image: redis:latest
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+
+volumes:
+  redis-data:

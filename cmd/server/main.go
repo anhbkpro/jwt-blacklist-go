@@ -6,13 +6,16 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"time"
 
 	"github.com/anhbkpro/jwt-blacklist-go/config"
 	_ "github.com/anhbkpro/jwt-blacklist-go/docs" // This is required for swagger
 	"github.com/anhbkpro/jwt-blacklist-go/internal/auth"
+	"github.com/anhbkpro/jwt-blacklist-go/internal/db"
 	"github.com/anhbkpro/jwt-blacklist-go/internal/handlers"
 	"github.com/anhbkpro/jwt-blacklist-go/internal/middleware"
+	"github.com/anhbkpro/jwt-blacklist-go/internal/models"
 	"github.com/go-redis/redis/v8"
 	"github.com/labstack/echo/v4"
 	echomiddleware "github.com/labstack/echo/v4/middleware"
@@ -31,7 +34,7 @@ import (
 // @license.name Apache 2.0
 // @license.url http://www.apache.org/licenses/LICENSE-2.0.html
 
-// @host localhost:8088
+// @host localhost:8080
 // @BasePath /api
 // @schemes http https
 
@@ -42,6 +45,41 @@ import (
 func main() {
 	// Load configuration
 	cfg := config.NewConfig()
+
+	// Initialize PostgreSQL database
+	var userRepo models.UserRepository
+	var postgres *db.PostgresDB
+	var err error
+
+	// Check if DB configuration is provided
+	if cfg.DB.Host != "" {
+		postgres, err = db.NewPostgresDB(cfg.DB)
+		if err != nil {
+			log.Printf("Warning: PostgreSQL connection failed: %v", err)
+			log.Println("Continuing with in-memory user store")
+		} else {
+			defer postgres.Close()
+
+			// Run migrations
+			migrationsPath := filepath.Join(".", "migrations")
+			if err := postgres.RunMigrations(migrationsPath); err != nil {
+				log.Printf("Warning: Database migrations failed: %v", err)
+			}
+
+			// Initialize user repository with PostgreSQL
+			userRepo = models.NewPostgresUserRepository(postgres.DB)
+			log.Println("Using PostgreSQL user repository")
+		}
+	}
+
+	// Fallback to in-memory repository if PostgreSQL is not available
+	if userRepo == nil {
+		log.Println("Using in-memory user repository")
+		userRepo = &models.InMemoryUserRepository{Users: models.DefaultUsers}
+	}
+
+	// Create user service
+	userService := models.NewUserService(userRepo)
 
 	// Initialize Redis client
 	redisClient := redis.NewClient(&redis.Options{
@@ -54,7 +92,7 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	_, err := redisClient.Ping(ctx).Result()
+	_, err = redisClient.Ping(ctx).Result()
 	if err != nil {
 		log.Printf("Warning: Redis connection failed: %v", err)
 		log.Println("Continuing without Redis (token blacklisting will not work)")
@@ -69,7 +107,7 @@ func main() {
 	authMiddleware := middleware.NewAuthMiddleware(jwtManager)
 
 	// Initialize handlers
-	authHandler := handlers.NewAuthHandler(jwtManager)
+	authHandler := handlers.NewAuthHandler(jwtManager, userService)
 
 	// Initialize Echo
 	e := echo.New()
@@ -105,7 +143,9 @@ func main() {
 
 	// Start server
 	go func() {
-		if err := e.Start(":8088"); err != nil && err != http.ErrServerClosed {
+		if err := e.Start(":8080"); err != nil && err != http.ErrServerClosed {
+			// log the error
+			log.Printf("Error starting server: %v", err)
 			e.Logger.Fatal("shutting down the server")
 		}
 	}()
