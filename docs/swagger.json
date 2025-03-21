@@ -19,7 +19,7 @@
         },
         "version": "1.0"
     },
-    "host": "localhost:8088",
+    "host": "localhost:8080",
     "basePath": "/api",
     "paths": {
         "/admin/dashboard": {

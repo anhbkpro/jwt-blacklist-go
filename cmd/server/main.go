@@ -16,10 +16,10 @@ import (
 	"github.com/anhbkpro/jwt-blacklist-go/internal/handlers"
 	"github.com/anhbkpro/jwt-blacklist-go/internal/middleware"
 	"github.com/anhbkpro/jwt-blacklist-go/internal/models"
+	"github.com/gin-gonic/gin"
 	"github.com/go-redis/redis/v8"
-	"github.com/labstack/echo/v4"
-	echomiddleware "github.com/labstack/echo/v4/middleware"
-	echoSwagger "github.com/swaggo/echo-swagger"
+	swaggerfiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
 // @title JWT Blacklisting API
@@ -109,30 +109,39 @@ func main() {
 	// Initialize handlers
 	authHandler := handlers.NewAuthHandler(jwtManager, userService)
 
-	// Initialize Echo
-	e := echo.New()
+	// Initialize Gin instead of Echo
+	r := gin.Default() // This includes Logger and Recovery middleware
 
-	// Middleware
-	e.Use(echomiddleware.Logger())
-	e.Use(echomiddleware.Recover())
-	e.Use(echomiddleware.CORS())
+	// CORS middleware
+	r.Use(func(c *gin.Context) {
+		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
+		c.Writer.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+
+		if c.Request.Method == "OPTIONS" {
+			c.AbortWithStatus(204)
+			return
+		}
+
+		c.Next()
+	})
 
 	// Swagger documentation
-	e.GET("/swagger/*", echoSwagger.WrapHandler)
+	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerfiles.Handler))
 
 	// Routes
-	e.GET("/", func(c echo.Context) error {
-		return c.String(http.StatusOK, "JWT Blacklisting Demo API")
+	r.GET("/", func(c *gin.Context) {
+		c.String(http.StatusOK, "JWT Blacklisting Demo API")
 	})
 
 	// Auth routes (public)
-	e.POST("/api/auth/login", authHandler.Login)
-	e.POST("/api/auth/refresh", authHandler.RefreshToken)
-	e.POST("/api/auth/logout", authHandler.Logout)
+	r.POST("/api/auth/login", authHandler.Login)
+	r.POST("/api/auth/refresh", authHandler.RefreshToken)
+	r.POST("/api/auth/logout", authHandler.Logout)
 
-	// Protected routes
-	protected := e.Group("/api")
-	protected.Use(authMiddleware.Authenticate)
+	// Protected routes group
+	protected := r.Group("/api")
+	protected.Use(authMiddleware.Authenticate())
 
 	protected.GET("/protected", authHandler.Protected)
 
@@ -141,23 +150,29 @@ func main() {
 	admin.Use(authMiddleware.RequireRole("admin"))
 	admin.GET("/dashboard", authHandler.AdminOnly)
 
+	// Create http.Server
+	srv := &http.Server{
+		Addr:    ":8080",
+		Handler: r,
+	}
+
 	// Start server
 	go func() {
-		if err := e.Start(":8080"); err != nil && err != http.ErrServerClosed {
-			// log the error
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Printf("Error starting server: %v", err)
-			e.Logger.Fatal("shutting down the server")
 		}
 	}()
 
-	// Wait for interrupt signal to gracefully shut down the server
+	// Graceful shutdown
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, os.Interrupt)
 	<-quit
 
 	ctx, cancel = context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	if err := e.Shutdown(ctx); err != nil {
-		e.Logger.Fatal(err)
+
+	// Shutdown server
+	if err := srv.Shutdown(ctx); err != nil {
+		log.Fatal("Server forced to shutdown:", err)
 	}
 }

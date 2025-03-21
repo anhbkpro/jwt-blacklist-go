@@ -30,7 +30,7 @@ definitions:
         example: Bearer
         type: string
     type: object
-host: localhost:8088
+host: localhost:8080
 info:
   contact:
     email: support@yourcompany.com

@@ -7,7 +7,7 @@ The JWT blacklist application includes comprehensive API documentation using Swa
 Once the application is running, you can access the Swagger UI at:
 
 ```
-http://localhost:8088/swagger/index.html
+http://localhost:8080/swagger/index.html
 ```
 
 ![Swagger UI Screenshot](./images/swagger-ui.png)

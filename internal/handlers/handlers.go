@@ -6,7 +6,7 @@ import (
 
 	"github.com/anhbkpro/jwt-blacklist-go/internal/auth"
 	"github.com/anhbkpro/jwt-blacklist-go/internal/models"
-	"github.com/labstack/echo/v4"
+	"github.com/gin-gonic/gin"
 )
 
 // AuthHandler handles authentication-related requests
@@ -53,37 +53,42 @@ type ErrorResponse struct {
 // @Failure 400 {object} ErrorResponse "Invalid request"
 // @Failure 401 {object} ErrorResponse "Invalid credentials"
 // @Router /auth/login [post]
-func (h *AuthHandler) Login(c echo.Context) error {
+func (h *AuthHandler) Login(c *gin.Context) {
 	var req LoginRequest
 	if err := c.Bind(&req); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, "invalid request")
+		c.JSON(http.StatusBadRequest, gin.H{"message": "invalid request"})
+		return
 	}
 
 	// Validate input
 	if req.Username == "" || req.Password == "" {
-		return echo.NewHTTPError(http.StatusBadRequest, "username and password are required")
+		c.JSON(http.StatusBadRequest, gin.H{"message": "username and password are required"})
+		return
 	}
 
 	// Check if user exists
-	user, exists := h.userService.GetUserByUsername(c.Request().Context(), req.Username)
+	user, exists := h.userService.GetUserByUsername(c.Request.Context(), req.Username)
 	if !exists {
-		return echo.NewHTTPError(http.StatusUnauthorized, "invalid credentials")
+		c.JSON(http.StatusUnauthorized, gin.H{"message": "invalid credentials"})
+		return
 	}
 
 	// Verify password
 	valid, err := models.VerifyPassword(req.Password, user.Password)
 	if err != nil || !valid {
-		return echo.NewHTTPError(http.StatusUnauthorized, "invalid credentials")
+		c.JSON(http.StatusUnauthorized, gin.H{"message": "invalid credentials"})
+		return
 	}
 
 	// Generate tokens
 	accessToken, refreshToken, err := h.jwtManager.GenerateTokens(user)
 	if err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, "failed to generate tokens")
+		c.JSON(http.StatusInternalServerError, gin.H{"message": "failed to generate tokens"})
+		return
 	}
 
 	// Return tokens
-	return c.JSON(http.StatusOK, TokenResponse{
+	c.JSON(http.StatusOK, TokenResponse{
 		AccessToken:  accessToken,
 		RefreshToken: refreshToken,
 		TokenType:    "Bearer",
@@ -101,16 +106,18 @@ func (h *AuthHandler) Login(c echo.Context) error {
 // @Success 200 {object} TokenResponse "New access token"
 // @Failure 401 {object} ErrorResponse "Invalid refresh token"
 // @Router /auth/refresh [post]
-func (h *AuthHandler) RefreshToken(c echo.Context) error {
+func (h *AuthHandler) RefreshToken(c *gin.Context) {
 	// Extract refresh token from Authorization header
-	authHeader := c.Request().Header.Get("Authorization")
+	authHeader := c.Request.Header.Get("Authorization")
 	if authHeader == "" {
-		return echo.NewHTTPError(http.StatusUnauthorized, "missing authorization header")
+		c.JSON(http.StatusUnauthorized, gin.H{"message": "missing authorization header"})
+		return
 	}
 
 	parts := strings.Split(authHeader, " ")
 	if len(parts) != 2 || parts[0] != "Bearer" {
-		return echo.NewHTTPError(http.StatusUnauthorized, "invalid authorization header format")
+		c.JSON(http.StatusUnauthorized, gin.H{"message": "invalid authorization header format"})
+		return
 	}
 
 	refreshTokenString := parts[1]
@@ -118,11 +125,12 @@ func (h *AuthHandler) RefreshToken(c echo.Context) error {
 	// Generate a new access token
 	accessToken, err := h.jwtManager.RefreshToken(refreshTokenString)
 	if err != nil {
-		return echo.NewHTTPError(http.StatusUnauthorized, "invalid refresh token")
+		c.JSON(http.StatusUnauthorized, gin.H{"message": "invalid refresh token"})
+		return
 	}
 
 	// Return the new access token
-	return c.JSON(http.StatusOK, TokenResponse{
+	c.JSON(http.StatusOK, TokenResponse{
 		AccessToken: accessToken,
 		TokenType:   "Bearer",
 		ExpiresIn:   900, // 15 minutes in seconds
@@ -137,16 +145,18 @@ func (h *AuthHandler) RefreshToken(c echo.Context) error {
 // @Success 200 {object} map[string]string "Successfully logged out"
 // @Failure 401 {object} ErrorResponse "Unauthorized"
 // @Router /auth/logout [post]
-func (h *AuthHandler) Logout(c echo.Context) error {
+func (h *AuthHandler) Logout(c *gin.Context) {
 	// Extract token from Authorization header
-	authHeader := c.Request().Header.Get("Authorization")
+	authHeader := c.Request.Header.Get("Authorization")
 	if authHeader == "" {
-		return echo.NewHTTPError(http.StatusUnauthorized, "missing authorization header")
+		c.JSON(http.StatusUnauthorized, gin.H{"message": "missing authorization header"})
+		return
 	}
 
 	parts := strings.Split(authHeader, " ")
 	if len(parts) != 2 || parts[0] != "Bearer" {
-		return echo.NewHTTPError(http.StatusUnauthorized, "invalid authorization header format")
+		c.JSON(http.StatusUnauthorized, gin.H{"message": "invalid authorization header format"})
+		return
 	}
 
 	tokenString := parts[1]
@@ -154,10 +164,11 @@ func (h *AuthHandler) Logout(c echo.Context) error {
 	// Blacklist the token
 	err := h.jwtManager.BlacklistToken(tokenString)
 	if err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, "failed to logout")
+		c.JSON(http.StatusInternalServerError, gin.H{"message": "failed to logout"})
+		return
 	}
 
-	return c.JSON(http.StatusOK, map[string]string{"message": "successfully logged out"})
+	c.JSON(http.StatusOK, gin.H{"message": "successfully logged out"})
 }
 
 // Protected is a handler for a protected resource
@@ -169,19 +180,21 @@ func (h *AuthHandler) Logout(c echo.Context) error {
 // @Success 200 {object} map[string]interface{} "Protected resource"
 // @Failure 401 {object} ErrorResponse "Unauthorized"
 // @Router /protected [get]
-func (h *AuthHandler) Protected(c echo.Context) error {
+func (h *AuthHandler) Protected(c *gin.Context) {
 	// Get user claims from context (set by auth middleware)
-	claims, ok := c.Get("user").(*auth.JWTClaims)
-	if !ok {
-		return echo.NewHTTPError(http.StatusUnauthorized, "unauthorized")
+	claims, exists := c.Get("user")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"message": "unauthorized"})
+		return
 	}
 
-	return c.JSON(http.StatusOK, map[string]interface{}{
+	userClaims := claims.(*auth.JWTClaims)
+	c.JSON(http.StatusOK, gin.H{
 		"message": "This is a protected resource",
-		"user": map[string]interface{}{
-			"id":       claims.UserID,
-			"username": claims.Username,
-			"role":     claims.Role,
+		"user": gin.H{
+			"id":       userClaims.UserID,
+			"username": userClaims.Username,
+			"role":     userClaims.Role,
 		},
 	})
 }
@@ -196,8 +209,8 @@ func (h *AuthHandler) Protected(c echo.Context) error {
 // @Failure 401 {object} ErrorResponse "Unauthorized"
 // @Failure 403 {object} ErrorResponse "Forbidden"
 // @Router /admin/dashboard [get]
-func (h *AuthHandler) AdminOnly(c echo.Context) error {
-	return c.JSON(http.StatusOK, map[string]string{
+func (h *AuthHandler) AdminOnly(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{
 		"message": "This is an admin-only resource",
 	})
 }
